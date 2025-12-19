@@ -1,42 +1,41 @@
 
 import React, { useState } from 'react';
 import { NAV_ITEMS } from '../constants';
-import { ChevronLeft, ChevronRight, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
   activeTab: string;
   onTabChange: (id: string) => void;
+  headerExtra?: React.ReactNode;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => {
+const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, headerExtra }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
+    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
       {/* Collapsible Sidebar */}
       <aside 
         className={`${
           isCollapsed ? 'w-20' : 'w-64'
         } bg-slate-900 text-slate-300 flex flex-col shadow-2xl z-30 transition-all duration-300 ease-in-out relative`}
       >
-        {/* Toggle Button */}
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="absolute -right-3 top-20 bg-indigo-600 text-white rounded-full p-1 shadow-lg hover:bg-indigo-500 transition-colors z-40"
-          title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
         >
           {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
         </button>
 
         <div className={`p-6 flex items-center gap-3 border-b border-slate-800 h-20 overflow-hidden ${isCollapsed ? 'justify-center' : ''}`}>
-          <div className="w-10 h-10 bg-indigo-600 rounded-lg flex-shrink-0 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-            <span className="font-bold text-xl tracking-tighter">G</span>
+          <div className="w-10 h-10 bg-indigo-600 rounded-lg flex-shrink-0 flex items-center justify-center text-white shadow-lg">
+            <span className="font-bold text-xl tracking-tighter italic">Δ</span>
           </div>
           {!isCollapsed && (
             <div className="animate-in fade-in duration-300">
-              <h1 className="text-lg font-bold text-white leading-tight">GOTME</h1>
-              <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold">Orchestrator</p>
+              <h1 className="text-lg font-bold text-white leading-tight">MAESTRO</h1>
+              <p className="text-[9px] text-slate-500 uppercase tracking-widest font-black">Delta Engine</p>
             </div>
           )}
         </div>
@@ -48,44 +47,29 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
               onClick={() => onTabChange(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
                 activeTab === item.id 
-                  ? 'bg-indigo-600/10 text-indigo-400 font-medium' 
+                  ? 'bg-indigo-600/10 text-indigo-400 font-bold' 
                   : 'hover:bg-slate-800 hover:text-white'
               } ${isCollapsed ? 'justify-center px-0' : ''}`}
-              title={isCollapsed ? item.label : ''}
             >
               <span className={`${activeTab === item.id ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-300'}`}>
                 {item.icon}
               </span>
-              {!isCollapsed && <span className="truncate">{item.label}</span>}
+              {!isCollapsed && <span className="truncate text-xs uppercase tracking-wider font-bold">{item.label}</span>}
             </button>
           ))}
         </nav>
-        
-        {!isCollapsed && (
-          <div className="p-6 border-t border-slate-800 animate-in fade-in duration-300">
-            <div className="bg-slate-800/50 p-4 rounded-xl space-y-3">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-500">M2M Compliance</span>
-                <span className="text-emerald-500 font-mono">ACTIVE</span>
-              </div>
-              <div className="h-1 bg-slate-700 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 w-full animate-pulse" />
-              </div>
-            </div>
-          </div>
-        )}
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto relative flex flex-col">
-        <header className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-20 flex items-center justify-between px-8 flex-shrink-0">
+        <header className="h-16 border-b border-slate-200 bg-white/90 backdrop-blur-md sticky top-0 z-20 flex items-center justify-between px-8 flex-shrink-0">
           <div className="flex items-center gap-4">
-            <h2 className="font-semibold text-slate-700 capitalize text-lg">{activeTab}</h2>
+            <h2 className="font-black text-slate-800 uppercase tracking-[0.2em] text-sm">{activeTab}</h2>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-full text-xs font-medium text-slate-600">
-              <div className="w-2 h-2 bg-indigo-500 rounded-full" />
-              Gemini 3 Flash Ready
+          <div className="flex items-center gap-4">
+            {headerExtra}
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-full text-[9px] font-black uppercase tracking-widest text-slate-500">
+              <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
+              Nihilo Filter Active
             </div>
           </div>
         </header>

@@ -1,62 +1,50 @@
 
 import React, { useState } from 'react';
-import { Terminal, Copy, Check, Download, ExternalLink, ShieldAlert, Cpu } from 'lucide-react';
+import { Terminal, Copy, Check, ShieldAlert, Cpu, Globe, Cloud, Layout } from 'lucide-react';
 
-const SCRIPT_CONTENT = `import os
+const SCRIPT_CONTENT = `"""
+GKE & BROWSER TASK AUTOMATOR [PROTOCOL 01-DELTA]
+Purpose: Replace manual browser steps and GKE lifecycle management.
+Required: gcloud CLI, kubectl, Playwright
+"""
+
+import os
 import asyncio
-import json
-import google.generativeai as genai
+from playwright.async_api import async_playwright
 
-# --- CONFIGURATION ---
-API_KEY = os.environ.get("API_KEY")
-if not API_KEY:
-    print("CRITICAL: Set API_KEY env var.")
-    exit(1)
+async def automate_browser_workflow(url_list):
+    print("🚀 INITIATING BROWSER TAB ORCHESTRATION...")
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=False)
+        context = await browser.new_context()
+        
+        # Parallel Tab Processing
+        pages = [await context.new_page() for _ in url_list]
+        for i, url in enumerate(url_list):
+            print(f"🔗 [TAB_{i}] SYNCING: {url}")
+            await pages[i].goto(url)
+            # Perform custom manual step automation here
+            # Example: await pages[i].click('button#deploy')
+        
+        await asyncio.sleep(5) # Observe results
+        await browser.close()
 
-genai.configure(api_key=API_KEY)
-conductor = genai.GenerativeModel('gemini-3-flash-preview')
-
-async def call_ai(prompt, system_instruction=""):
-    response = await conductor.generate_content_async(
-        contents=prompt,
-        generation_config={"response_mime_type": "text/plain"},
-        # Note: for specific roles, we wrap in system_instruction
-    )
-    return response.text
-
-async def run_iteration(round_num, topic, contract_context):
-    print(f"--- GENERATION {round_num} ---")
-    print(f"Active Contract: {contract_context[:50]}...")
-    
-    # Phase: Parallel Breeding
-    agents = ["Analyst", "Critique", "Visionary"]
-    tasks = [call_ai(f"CONTRACT: {contract_context}\\nTOPIC: {topic}\\nROLE: {role}") for role in agents]
-    responses = await asyncio.gather(*tasks)
-    
-    # Phase: Evolutionary Synthesis
-    synthesis_prompt = f"""
-    SUB-AGENT DATA: {responses}
-    CURRENT CONTRACT: {contract_context}
-    TASK: Synthesize gains AND EVOLVE THE CONTRACT for Round {round_num + 1}.
-    Format:
-    ### Synthesis
-    ...
-    ### Evolved Contract
-    ...
-    """
-    evolution_res = await call_ai(synthesis_prompt)
-    return evolution_res
+async def sync_gke_state(cluster_name, zone, project_id):
+    print(f"☸️  HARDENING GKE STATE: {cluster_name}")
+    # Simulate gcloud/kubectl automation
+    commands = [
+        f"gcloud container clusters get-credentials {cluster_name} --zone {zone} --project {project_id}",
+        "kubectl get pods -A",
+        "kubectl apply -f hardened_security_policy.yaml"
+    ]
+    for cmd in commands:
+        print(f"💻 EXECUTING: {cmd}")
+        # os.system(cmd) # Uncomment to execute in local shell
 
 async def main():
-    topic = "Automated GKE Security Patching"
-    contract = "Adhere to NIST guidelines. Prioritize zero-downtime."
-    
-    for i in range(1, 4):
-        res = await run_iteration(i, topic, contract)
-        # Parse for next round
-        if "### Evolved Contract" in res:
-            contract = res.split("### Evolved Contract")[1].strip()
-        print(f"Evolution complete. Contract strengthened for next generation.")
+    urls = ["https://console.cloud.google.com/gke/", "https://github.com/my-org/infra"]
+    await automate_browser_workflow(urls)
+    await sync_gke_state("maestro-cluster-01", "us-central1-a", "my-gcp-project")
 
 if __name__ == "__main__":
     asyncio.run(main())`;
@@ -74,54 +62,64 @@ const AutomationView: React.FC = () => {
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="space-y-1">
-          <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Evolutionary Automation</h2>
-          <p className="text-slate-500 text-sm">Deploy a Python worker that handles iterative contract refinement.</p>
+          <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Hardened Automation Hub</h2>
+          <p className="text-slate-500 text-sm">Replace manual browser navigation and GKE management with Protocol-Delta scripts.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={handleCopy}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-500/20"
-          >
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-            {copied ? 'Copied!' : 'Copy Script'}
-          </button>
-        </div>
+        <button 
+          onClick={handleCopy}
+          className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold text-xs hover:bg-indigo-600 transition-all shadow-xl"
+        >
+          {copied ? <Check size={16} /> : <Copy size={16} />}
+          {copied ? 'Ledger Copied' : 'Copy Delta Script'}
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-slate-900 rounded-[2rem] overflow-hidden border border-slate-800 shadow-2xl">
-          <div className="px-6 py-4 bg-slate-800/50 border-b border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+        <div className="lg:col-span-2 bg-slate-950 rounded-[2.5rem] overflow-hidden border border-slate-800 shadow-2xl">
+          <div className="px-8 py-5 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-3">
               <div className="flex gap-1.5">
                 <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50" />
-                <div className="w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500/50" />
                 <div className="w-3 h-3 rounded-full bg-emerald-500/20 border border-emerald-500/50" />
               </div>
-              <span className="ml-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">evolution_worker.py</span>
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">gke_browser_delta.py</span>
             </div>
-            <Terminal size={14} className="text-slate-500" />
+            <Terminal size={16} className="text-slate-600" />
           </div>
-          <div className="p-6 overflow-x-auto">
-            <pre className="text-indigo-300 font-mono text-xs leading-relaxed">
+          <div className="p-8 overflow-x-auto">
+            <pre className="text-emerald-400/90 font-mono text-xs leading-relaxed">
               <code>{SCRIPT_CONTENT}</code>
             </pre>
           </div>
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm space-y-6">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-              <Cpu size={18} className="text-indigo-600" />
-              Worker Blueprint
+          <div className="bg-white rounded-[2rem] border border-slate-200 p-8 shadow-sm space-y-6">
+            <h3 className="font-bold text-slate-800 flex items-center gap-3">
+              <Cpu size={20} className="text-indigo-600" />
+              Delta Logic Units
             </h3>
             <div className="space-y-4">
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Iterative Evolution</div>
-                <p className="text-xs text-slate-500">The script automatically feeds the synthesized "Evolved Contract" into the next cycle.</p>
+              <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-4">
+                <Globe size={18} className="text-blue-500 shrink-0 mt-1" />
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Browser Syncer</div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">Automates page interaction across multiple GCP console tabs simultaneously.</p>
+                </div>
               </div>
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Parallelism</div>
-                <p className="text-xs text-slate-500">Uses asyncio to ensure all generation tasks fire simultaneously.</p>
+              <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-4">
+                <Cloud size={18} className="text-emerald-500 shrink-0 mt-1" />
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">GKE Lifecycle</div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">Wraps gcloud and kubectl into repeatable, auditable automation blocks.</p>
+                </div>
+              </div>
+              <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-4">
+                <ShieldAlert size={18} className="text-amber-500 shrink-0 mt-1" />
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nihilo Filter</div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">Ensures no manual input can compromise the IAT forensic signature.</p>
+                </div>
               </div>
             </div>
           </div>

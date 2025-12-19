@@ -22,7 +22,8 @@ import {
   ShieldAlert,
   TerminalSquare,
   Dna,
-  RefreshCcw
+  RefreshCcw,
+  ZapOff
 } from 'lucide-react';
 import { Schema, Scenario } from './types';
 
@@ -46,6 +47,13 @@ export const SCHEMAS: Schema[] = [
 
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'distributed-optimization',
+    name: 'Distributed System Optimization',
+    defaultTopic: 'Optimize the GKE state automation loop using distributed intelligence.',
+    defaultContext: 'Harden the Python automation scripts for GKE. Use collective intelligence to find edge cases where manual browser steps can be replaced by headless orchestration.',
+    recommendedSchema: 'parallel'
+  },
+  {
     id: 'meta-optimization',
     name: 'Engine Self-Improvement',
     defaultTopic: 'Refine the GOTME synthesis logic to prioritize structural feasibility over generic summaries.',
@@ -58,13 +66,6 @@ export const SCENARIOS: Scenario[] = [
     defaultTopic: 'Audit this smart contract for reentrancy vulnerabilities.',
     defaultContext: 'Focus on high-security standards. Ensure sub-agents use Code Sandbox for verification.',
     recommendedSchema: 'competitive'
-  },
-  {
-    id: 'system-design',
-    name: 'System Architecture',
-    defaultTopic: 'Design a distributed locking mechanism for GKE.',
-    defaultContext: 'Balance consistency and availability. Use SLMs for atomic component logic.',
-    recommendedSchema: 'parallel'
   },
   {
     id: 'product-strategy',

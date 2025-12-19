@@ -1,5 +1,6 @@
 
 export type SchemaType = 'parallel' | 'sequential' | 'competitive';
+export type OrchestrationPhase = 'initial' | 'series' | 'parallel_convergence' | 'completed';
 
 export interface Schema {
   id: SchemaType;
@@ -35,10 +36,11 @@ export interface AIRun {
   aiName: string;
   response: string;
   charCount: number;
-  rating?: number; // User-provided quality score 1-5
+  rating?: number;
   modelType: 'SLM' | 'LLM';
   source: 'cloud' | 'local';
   toolCalls?: ToolCall[];
+  groundingChunks?: any[];
 }
 
 export interface ModelMetric {
@@ -49,22 +51,17 @@ export interface ModelMetric {
   type: 'SLM' | 'LLM';
 }
 
-export interface Tool {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-}
-
 export interface Round {
   roundNumber: number;
   topic: string;
   runs: AIRun[];
   synthesis: string;
-  evolvedContract?: string; // The refined constraints for the NEXT round
+  evolvedContract?: string;
   synthesisCharCount: number;
   timestamp: string;
-  piecesId?: string; // Reference to the archived asset in Pieces OS
+  piecesId?: string;
+  iatSignature?: string; 
+  phase: OrchestrationPhase;
 }
 
 export interface Session {
@@ -72,13 +69,12 @@ export interface Session {
   contract: Contract;
   rounds: Round[];
   status: 'idle' | 'co-creating' | 'orchestrating' | 'completed' | 'converged';
+  phase: OrchestrationPhase;
   convergencePeak?: number;
   convergenceThreshold?: number;
-  activePartners: string[]; // List of currently active models
-  activeTools: string[]; // List of IDs of enabled tools
-  modelMetrics: Record<string, ModelMetric>; // Performance tracking
+  activePartners: string[];
+  activeTools: string[];
+  modelMetrics: Record<string, ModelMetric>;
   isPiecesConnected: boolean;
   isOllamaConnected: boolean;
 }
-
-export type ModelRole = 'conductor' | 'partner';

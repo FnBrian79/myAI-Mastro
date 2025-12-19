@@ -11,10 +11,14 @@ import {
   Wand2,
   Globe,
   Code,
-  Database
+  Database,
+  Cpu,
+  ListChecks,
+  Swords,
+  Settings2
 } from 'lucide-react';
-import { Session, ModelMetric } from '../types';
-import { MODEL_POOL, AVAILABLE_TOOLS } from '../constants';
+import { Session, ModelMetric, SchemaType } from '../types';
+import { MODEL_POOL, AVAILABLE_TOOLS, SCHEMAS } from '../constants';
 
 interface GovernanceViewProps {
   session: Session;
@@ -40,6 +44,16 @@ const GovernanceView: React.FC<GovernanceViewProps> = ({ session, onUpdate }) =>
     onUpdate({ ...session, activeTools: updatedTools });
   };
 
+  const setSchema = (schema: SchemaType) => {
+    onUpdate({
+      ...session,
+      contract: {
+        ...session.contract,
+        schema: schema
+      }
+    });
+  };
+
   const activeMetrics = session.activePartners.map(p => session.modelMetrics[p] || { 
     name: p, 
     totalChars: 0, 
@@ -57,6 +71,14 @@ const GovernanceView: React.FC<GovernanceViewProps> = ({ session, onUpdate }) =>
     }
   };
 
+  const getSchemaIcon = (id: SchemaType) => {
+    switch (id) {
+      case 'parallel': return <Cpu size={18} />;
+      case 'sequential': return <ListChecks size={18} />;
+      case 'competitive': return <Swords size={18} />;
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="flex items-end justify-between">
@@ -68,6 +90,36 @@ const GovernanceView: React.FC<GovernanceViewProps> = ({ session, onUpdate }) =>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
+          
+          {/* Processing Protocol Section */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-8 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+              <h3 className="font-bold text-slate-700 uppercase tracking-widest text-xs">Processing Protocol</h3>
+              <Settings2 size={16} className="text-slate-400" />
+            </div>
+            <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              {SCHEMAS.map((sch) => (
+                <button
+                  key={sch.id}
+                  onClick={() => setSchema(sch.id)}
+                  className={`p-5 rounded-2xl border text-left transition-all flex flex-col gap-2 ${
+                    session.contract.schema === sch.id
+                      ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg'
+                      : 'bg-white border-slate-100 hover:border-slate-300 text-slate-600'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    {getSchemaIcon(sch.id)}
+                    <span className="font-bold text-xs uppercase tracking-wider">{sch.name}</span>
+                  </div>
+                  <p className={`text-[10px] leading-relaxed ${session.contract.schema === sch.id ? 'text-indigo-100' : 'text-slate-400'}`}>
+                    {sch.description}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Agentic Tools Section */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-8 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
