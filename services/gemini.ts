@@ -13,7 +13,7 @@ export const conductSession = async (prompt: string, role: string = "Chief Resea
     config: {
       systemInstruction: `You are the ${role} of a high-stakes R&D Department. Your goal is to oversee the 'GOTME' Lab. 
       You treat every idea as an experimental hypothesis that must be hardened through feasibility analysis and destructive logic. 
-      You value truth over consensus.`,
+      You value truth over consensus. If an idea is unfeasible, say so clearly.`,
     },
   });
   return result.text;
@@ -75,7 +75,7 @@ export const refineContract = async (topic: string, context: string) => {
   RESEARCH IDEA: ${topic}
   PROPOSED PARAMETERS: ${context}
   
-  Provide a more rigorous, scientifically challenging, and constraint-heavy version of this proposal. Ensure it is formatted to be stress-tested.`;
+  Provide a more rigorous, scientifically challenging, and constraint-heavy version of this proposal. Ensure it is formatted to be stress-tested for feasibility and optimization potential.`;
   
   const result = await conductSession(prompt, "Thesis Architect");
   return result;
@@ -84,11 +84,11 @@ export const refineContract = async (topic: string, context: string) => {
 export const simulateParallelAIs = async (contract: string, topic: string, partners: {name: string, type: 'SLM' | 'LLM', isLocal?: boolean}[], enabledTools: string[]) => {
   // Define specialized R&D roles for the sub-agents
   const roles = [
-    { role: "Feasibility Specialist", focus: "Can we build this? What are the technical bottlenecks and resource requirements?" },
-    { role: "Adversarial Skeptic", focus: "Why will this fail? Find the logical fallacies, security holes, and structural weaknesses." },
-    { role: "Innovation Architect", focus: "How can we make this 10x better? What are the untapped synergies or radical improvements?" },
-    { role: "Operational Strategist", focus: "What are the immediate next steps? How does this integrate with existing systems?" },
-    { role: "Ethics & Compliance Unit", focus: "What are the hidden risks? Are there governing constraints being ignored?" }
+    { role: "Feasibility Specialist", focus: "Can we build this? Identify technical debt, resource costs, and physical/digital limitations." },
+    { role: "Adversarial Skeptic", focus: "Why will this fail? Find the logical fallacies, security holes, and structural weaknesses. Attack the hypothesis." },
+    { role: "Innovation Architect", focus: "How can we make this 10x better? Look for radical synergies, untapped tech, or paradigm shifts." },
+    { role: "Operational Strategist", focus: "What are the immediate execution steps? Focus on integration and MVP deployment." },
+    { role: "Ethics & Risk Unit", focus: "What are the hidden dangers? Regulatory hurdles, human impact, and long-term consequences." }
   ];
 
   const tasks = partners.map(async (partner, index) => {
@@ -99,18 +99,18 @@ export const simulateParallelAIs = async (contract: string, topic: string, partn
       : "You are a broad LLM unit. Focus on systemic risk, creative breakthroughs, and paradigm shifts.";
 
     const toolNote = enabledTools.length > 0 
-      ? `Experimental tools enabled: ${enabledTools.join(', ')}. Use [TOOL_USE: toolName | action | result] if needed.`
-      : "No external tools available.";
+      ? `Experimental tools enabled: ${enabledTools.join(', ')}. Use [TOOL_USE: toolName | action | result] for interactions.`
+      : "No external tools available for this trial.";
 
-    const prompt = `### EXPERIMENT: ${topic}
+    const prompt = `### LABORATORY EXPERIMENT: ${topic}
     
     ### THE CURRENT THESIS (RESEARCH PROPOSAL)
     ${contract}
     
-    ### YOUR LABORATORY ROLE
-    Unit Identity: ${partner.name}
-    Assigned Specialization: ${roleConfig.role}
-    Mission Focus: ${roleConfig.focus}
+    ### YOUR ASSIGNED SPECIALIZATION
+    Unit: ${partner.name}
+    Specialization: ${roleConfig.role}
+    Mission: ${roleConfig.focus}
     ${intensityNote}
     ${toolNote}
     
@@ -118,7 +118,7 @@ export const simulateParallelAIs = async (contract: string, topic: string, partn
     Perform a rigorous evaluation of the 'CURRENT THESIS'. 
     DO NOT provide generic praise. 
     Identify specifically where the feasibility is low, where the logic breaks, or where a 10x improvement is hidden. 
-    Your report should be brutal, honest, and high-signal.`;
+    Your report should be brutal, honest, and high-signal. Focus on FEASIBILITY and WAYS TO IMPROVE.`;
 
     let responseText = "";
     let searchGrounding = undefined;
@@ -171,20 +171,52 @@ export const synthesizeDebrief = async (responses: any[], currentContract: strin
   ${responsesText}
   
   ### MISSION: STRATEGIC SYNTHESIS
-  1. FEASIBILITY SCORE (0-100): Based on the sub-agent reports, how viable is this current thesis?
-  2. BREAKTHROUGH DISCOVERY: What was the single most valuable improvement suggested by the reviewers?
-  3. OPTIMIZATION PATHWAY: Synthesize the findings into a clear, hardened strategy.
-  4. EVOLVE THE THESIS: Rewrite the Research Proposal (Contract) to include the breakthroughs and solve the feasibility gaps identified.
+  1. FEASIBILITY ANALYSIS: Assign a Feasibility Score (0-100%) and justify it based on sub-agent feedback.
+  2. BREAKTHROUGH DISCOVERY: What was the single most valuable improvement or "Better Way" suggested?
+  3. OPTIMIZATION PATHWAY: Synthesize the findings into a clear, hardened strategy for the next generation.
+  4. EVOLVE THE THESIS: Rewrite the Proposal (Contract) to include the breakthroughs and solve the feasibility gaps identified.
   
   OUTPUT FORMAT:
   ### Synthesis
-  [Executive Summary of the Feasibility and Optimization Pathways]
+  **FEASIBILITY SCORE:** [0-100]%
+  
+  **Analysis:** [Summary of breakthroughs and surviving logic]
 
   ### Evolved Contract
   [The New Hardened Research Proposal for the next generation]`;
   
   const result = await conductSession(prompt, "Chief Research Director");
   
+  const parts = result.split('### Evolved Contract');
+  return {
+    synthesis: parts[0].replace('### Synthesis', '').trim(),
+    evolvedContract: parts[1]?.trim() || currentContract
+  };
+};
+
+export const synthesizeCompetitiveDebrief = async (responses: any[], currentContract: string, topic: string) => {
+  const responsesText = responses.map(r => `## CANDIDATE: ${r.aiName.toUpperCase()}\n${r.response}`).join('\n\n');
+  const prompt = `You are the R&D Lab Arbiter judging a competitive debate on: ${topic}
+  
+  CURRENT LABORATORY THESIS:
+  ${currentContract}
+
+  DEBATE LOG:
+  ${responsesText}
+  
+  ### TASK
+  1. Determine which sub-agent successfully 'decapitated' the current thesis with better logic.
+  2. Select the superior logical strands based on feasibility and 10x improvement potential.
+  3. REWRITE THE THESIS: Update the parameters for the next generation to reflect the winner's dominance.
+  
+  OUTPUT FORMAT:
+  ### Synthesis
+  [Judgment summary and feasibility notes]
+
+  ### Evolved Contract
+  [The Hardened Thesis for the next generation]`;
+  
+  const result = await conductSession(prompt, "Lab Arbiter");
   const parts = result.split('### Evolved Contract');
   return {
     synthesis: parts[0].replace('### Synthesis', '').trim(),

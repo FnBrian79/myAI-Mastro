@@ -20,7 +20,9 @@ import {
   FileCode,
   Lightbulb,
   ShieldAlert,
-  TerminalSquare
+  TerminalSquare,
+  Dna,
+  RefreshCcw
 } from 'lucide-react';
 import { Schema, Scenario } from './types';
 
@@ -43,6 +45,13 @@ export const SCHEMAS: Schema[] = [
 ];
 
 export const SCENARIOS: Scenario[] = [
+  {
+    id: 'meta-optimization',
+    name: 'Engine Self-Improvement',
+    defaultTopic: 'Refine the GOTME synthesis logic to prioritize structural feasibility over generic summaries.',
+    defaultContext: 'Analyze the current Lab Architect prompts. Find logical loops that cause repetition. Propose a "Self-Correcting" prompt structure.',
+    recommendedSchema: 'competitive'
+  },
   {
     id: 'code-review',
     name: 'Critical Code Review',
@@ -67,9 +76,9 @@ export const SCENARIOS: Scenario[] = [
 ];
 
 export const INITIAL_PARTNERS = [
+  "Gemini 3 Pro",
   "Claude 3.5 Sonnet",
   "GPT-4o",
-  "Gemini 1.5 Pro",
   "Llama 3.1 70B",
   "qwen2.5:7b"
 ];
@@ -81,14 +90,14 @@ export interface ModelEntry {
 }
 
 export const MODEL_POOL: ModelEntry[] = [
+  { name: "Gemini 3 Pro", type: 'LLM' },
+  { name: "Gemini 3 Flash", type: 'LLM' },
   { name: "Claude 3.5 Sonnet", type: 'LLM' },
   { name: "Claude 3.5 Haiku", type: 'LLM' },
   { name: "GPT-4o", type: 'LLM' },
   { name: "GPT-4o-mini", type: 'LLM' },
   { name: "o1-preview", type: 'LLM' },
   { name: "o1-mini", type: 'LLM' },
-  { name: "Gemini 1.5 Pro", type: 'LLM' },
-  { name: "Gemini 1.5 Flash", type: 'LLM' },
   { name: "Llama 3.1 405B", type: 'LLM' },
   { name: "Llama 3.1 70B", type: 'LLM' },
   { name: "DeepSeek V3", type: 'LLM' },

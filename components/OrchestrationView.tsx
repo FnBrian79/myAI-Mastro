@@ -3,43 +3,31 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Play, 
   RotateCw, 
-  AlertTriangle, 
   Brain, 
   Zap, 
   Check,
   ShieldCheck,
-  Settings2,
   StopCircle,
-  TrendingDown,
-  Target,
-  Star,
   Trophy,
-  ArrowUpRight,
-  Globe,
-  Code,
-  Database,
-  Wand2,
-  PanelRight,
-  Maximize2,
-  Minimize2,
-  FileText,
   MessagesSquare,
-  Archive,
-  Search,
-  HardDrive,
   Cpu,
-  ListChecks,
-  Swords,
   RefreshCcw,
   Volume2,
-  ExternalLink,
   GitMerge,
   Edit3,
   Dna,
   ShieldQuestion,
   Microscope,
   Atom,
-  TestTube2
+  TestTube2,
+  Activity,
+  Terminal,
+  VolumeX,
+  Radio,
+  BarChart3,
+  Minimize2,
+  PanelRight,
+  Sparkles
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Session, Round, AIRun, ModelMetric } from '../types';
@@ -58,11 +46,14 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAutoEvolving, setIsAutoEvolving] = useState(false);
   const [showInsights, setShowInsights] = useState(true);
+  const [diagTab, setDiagTab] = useState<'analytics' | 'control' | 'intelligence'>('analytics');
   const [currentStep, setCurrentStep] = useState<'idle' | 'parallel' | 'synthesis' | 'archiving'>('idle');
   const [threshold, setThreshold] = useState(session.convergenceThreshold || 75);
   const [isPlaying, setIsPlaying] = useState<string | null>(null);
+  const [isAutoBriefing, setIsAutoBriefing] = useState(false);
   const [manualContract, setManualContract] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -178,6 +169,10 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
         modelMetrics: newMetrics
       });
 
+      if (isAutoBriefing) {
+        handleSpeak(synthesisRes.synthesis, `auto-brief-${currentRoundNum}`);
+      }
+
     } catch (error) {
       console.error(error);
       setIsAutoEvolving(false);
@@ -187,26 +182,68 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
     }
   };
 
+  const decodeAudioData = async (base64: string): Promise<AudioBuffer> => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+    }
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const dataInt16 = new Int16Array(bytes.buffer);
+    const frameCount = dataInt16.length;
+    const buffer = audioContextRef.current.createBuffer(1, frameCount, 24000);
+    const channelData = buffer.getChannelData(0);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i] / 32768.0;
+    }
+    return buffer;
+  };
+
   const handleSpeak = async (text: string, id: string) => {
-    if (isPlaying === id) return;
+    if (isPlaying) return;
     setIsPlaying(id);
     try {
       const base64 = await generateSpeech(text);
-      if (base64) {
-        const audio = new Audio(`data:audio/pcm;base64,${base64}`);
-        // Audio playback logic placeholder
+      if (base64 && audioContextRef.current) {
+        const audioBuffer = await decodeAudioData(base64);
+        const source = audioContextRef.current.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContextRef.current.destination);
+        source.onended = () => setIsPlaying(null);
+        source.start();
+      } else {
+        setIsPlaying(null);
       }
     } catch (e) {
       console.error("TTS Error", e);
-    } finally {
-      setTimeout(() => setIsPlaying(null), 3000);
+      setIsPlaying(null);
     }
+  };
+
+  const handleSelfOptimize = () => {
+    if (!latestRound) return;
+    const metaTopic = `Optimization of GOTME Logic for Round ${latestRound.roundNumber + 1}`;
+    const metaContext = `CURRENT THESIS:\n${latestRound.evolvedContract}\n\nLATEST SYNTHESIS:\n${latestRound.synthesis}\n\nMETA-GOAL: Identify the architectural flaws in the 'Lab Architect' prompts and 'Synthesis' logic that led to the current results. Propose a more 'adversarial' and 'feasibility-focused' engine mutation.`;
+    
+    onUpdate({
+      ...session,
+      contract: {
+        ...session.contract,
+        topic: metaTopic,
+        context: metaContext,
+        schema: 'competitive'
+      },
+      rounds: [] // Reset rounds for the new meta-session
+    });
+    setDiagTab('analytics');
   };
 
   const latestRound = session.rounds[session.rounds.length - 1];
   const peak = session.convergencePeak || 0;
-  const leaderboard = (Object.values(session.modelMetrics) as ModelMetric[]).sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0) || b.totalChars - a.totalChars);
-  const currentSchema = SCHEMAS.find(s => s.id === session.contract.schema);
+  const leaderboard = (Object.values(session.modelMetrics) as ModelMetric[]).sort((a, b) => b.totalChars - a.totalChars);
 
   const applyIntervention = () => {
     if (!manualContract) return;
@@ -223,28 +260,38 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
   const pullToLab = (contract: string) => {
     setManualContract(contract);
     setShowInsights(true);
+    setDiagTab('control');
   };
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 h-full min-h-0">
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${showInsights ? 'lg:w-2/3' : 'w-full'}`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
-                <Microscope size={24} className="text-indigo-600" />
-                R&D Department Gauntlet
-              </h2>
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100">
-                <Dna size={12} className="animate-spin-slow" />
-                <span className="text-[10px] font-bold uppercase tracking-wider">Evolution Lab</span>
+          <div className="flex items-center gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
+                  <Microscope size={24} className="text-indigo-600" />
+                  R&D Department
+                </h2>
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100">
+                  <Radio size={12} className={isAutoEvolving ? "animate-pulse" : ""} />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Lab Active</span>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 mt-1">
+                <span className="text-slate-500 text-xs font-medium uppercase tracking-wider">Experiment Round {session.rounds.length}</span>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2 mt-1">
-              <span className="text-slate-500 text-xs font-medium uppercase tracking-wider">Lab Generation {session.rounds.length}</span>
-              <span className="text-slate-300">•</span>
-              <span className="text-slate-400 text-xs italic flex items-center gap-1"><Atom size={12} /> Breeding optimal failure resistance</span>
-            </div>
+            
+            <button 
+              onClick={() => setIsAutoBriefing(!isAutoBriefing)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase transition-all border ${isAutoBriefing ? 'bg-indigo-600 text-white border-indigo-500 shadow-md' : 'bg-white text-slate-400 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'}`}
+              title="Speak synthesis report automatically"
+            >
+              {isAutoBriefing ? <Volume2 size={12} /> : <VolumeX size={12} />}
+              Auto-Briefing {isAutoBriefing ? 'ON' : 'OFF'}
+            </button>
           </div>
           
           <div className="flex items-center gap-2">
@@ -265,7 +312,7 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
               disabled={isProcessing || session.status === 'converged'}
               className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl font-bold transition-all ${session.status === 'converged' ? 'bg-emerald-100 text-emerald-600 border-2 border-emerald-200 shadow-sm' : 'bg-indigo-600 text-white shadow-xl shadow-indigo-500/20 hover:scale-105 active:scale-95'} disabled:opacity-50`}
             >
-              {session.status === 'converged' ? <><Check size={18} />Study Finalized</> : isProcessing ? <><RotateCw size={18} className="animate-spin" />Simulating Next Gen...</> : <><Play size={18} fill="currentColor" />{session.rounds.length === 0 ? 'Ignite Genesis' : 'Breed Next Generation'}</>}
+              {session.status === 'converged' ? <><Check size={18} />Trial Complete</> : isProcessing ? <><RotateCw size={18} className="animate-spin" />Processing...</> : <><Play size={18} fill="currentColor" />{session.rounds.length === 0 ? 'Ignite Lab' : 'Breed Generation'}</>}
             </button>
           </div>
         </div>
@@ -278,15 +325,16 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
                  <div className="relative w-24 h-24 bg-indigo-50 rounded-3xl flex items-center justify-center border border-indigo-100"><TestTube2 size={48} className="text-indigo-600" /></div>
               </div>
               <div className="space-y-3">
-                <h3 className="text-2xl font-bold text-slate-800 tracking-tight uppercase tracking-widest">Ancestral Thesis Deployed</h3>
-                <p className="text-slate-500 max-w-md mx-auto text-sm leading-relaxed italic">"Initiating Generation 0. Conductor is awaiting sub-agent destructive review to begin the selective breeding process."</p>
+                <h3 className="text-2xl font-bold text-slate-800 tracking-tight uppercase tracking-widest">Awaiting Breeding Proposal</h3>
+                <p className="text-slate-500 max-w-md mx-auto text-sm leading-relaxed italic">"Initiate the first R&D cycle to begin destructive peer review and feasibility assessment."</p>
                 <div className="mt-10 p-8 bg-slate-50 rounded-3xl border border-slate-100 text-left shadow-inner group relative">
                    <div className="absolute top-4 right-4"><Zap size={16} className="text-amber-400 opacity-20" /></div>
                    <div className="flex items-center gap-2 mb-3">
                      <ShieldCheck size={14} className="text-emerald-600" />
-                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Baseline Research Parameters</div>
+                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Active Research Topic</div>
                    </div>
-                   <p className="text-sm text-slate-600 leading-relaxed font-mono opacity-80 group-hover:opacity-100 transition-opacity">{session.contract.context}</p>
+                   <p className="text-sm text-slate-600 leading-relaxed font-mono opacity-80 group-hover:opacity-100 transition-opacity font-bold">{session.contract.topic}</p>
+                   <p className="text-xs text-slate-500 mt-2 font-mono opacity-80 group-hover:opacity-100 transition-opacity">{session.contract.context}</p>
                 </div>
               </div>
             </div>
@@ -297,8 +345,8 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
               <div className="flex items-center gap-4">
                 <div className="h-px bg-slate-200 flex-1" />
                 <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] px-5 py-1.5 border border-slate-200 rounded-full bg-white shadow-sm">
-                  <Dna size={12} className="text-indigo-500" />
-                  <span>R&D Cycle {round.roundNumber} / Selective Hardening</span>
+                  <Atom size={12} className="text-indigo-500" />
+                  <span>Cycle {round.roundNumber} / Laboratory Phase</span>
                 </div>
                 <div className="h-px bg-slate-200 flex-1" />
               </div>
@@ -310,8 +358,8 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
                        <ShieldQuestion size={16} />
                      </div>
                      <div>
-                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block leading-none mb-1">Peer Review Phase</span>
-                       <span className="text-xs font-bold text-slate-700">Agents attempting logical deconstruction</span>
+                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block leading-none mb-1">Destructive Peer Review</span>
+                       <span className="text-xs font-bold text-slate-700">Multi-Agent Stress Test</span>
                      </div>
                    </div>
                    <div className="flex items-center gap-4">
@@ -320,51 +368,47 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
                 </div>
                 
                 <div className="p-10 space-y-10">
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                     {round.runs.map((run, rIdx) => (
-                      <div key={rIdx} className="p-5 rounded-[2rem] border space-y-4 bg-slate-50 border-slate-100 hover:bg-white hover:border-indigo-200 transition-all hover:-translate-y-1 group">
+                      <div key={rIdx} className="p-4 rounded-[1.5rem] border space-y-3 bg-slate-50 border-slate-100 hover:bg-white hover:border-indigo-200 transition-all group overflow-hidden">
                         <div className="flex justify-between items-start">
                           <div className="flex flex-col min-w-0">
-                            <div className="text-[11px] font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">{run.aiName}</div>
-                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded inline-block w-fit mt-1.5 ${run.modelType === 'SLM' ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'}`}>{run.modelType} | {run.source.toUpperCase()}</span>
+                            <div className="text-[10px] font-bold text-slate-800 truncate">{run.aiName.split('(')[0]}</div>
+                            <span className="text-[8px] text-indigo-500 font-bold uppercase truncate">{run.aiName.split('(')[1]?.replace(')', '') || 'Specialist'}</span>
                           </div>
-                          <button onClick={() => handleSpeak(run.response, `run-${idx}-${rIdx}`)} className="p-1.5 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
-                            <Volume2 size={12} />
+                          <button onClick={() => handleSpeak(run.response, `run-${idx}-${rIdx}`)} className={`p-1 transition-all rounded-lg ${isPlaying === `run-${idx}-${rIdx}` ? 'text-indigo-600 bg-indigo-50 animate-pulse' : 'text-slate-300 hover:text-indigo-600'}`}>
+                            <Volume2 size={10} />
                           </button>
                         </div>
-                        <div className="h-px bg-slate-100 group-hover:bg-indigo-100 transition-colors" />
-                        <div className="flex gap-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <button key={star} onClick={() => {}} className={`transition-colors ${run.rating && run.rating >= star ? 'text-amber-400' : 'text-slate-200 hover:text-amber-200'}`}>
-                              <Star size={11} fill={run.rating && run.rating >= star ? "currentColor" : "none"} />
-                            </button>
-                          ))}
+                        <div className="text-[10px] text-slate-600 line-clamp-4 italic leading-relaxed">
+                          {run.response}
                         </div>
                       </div>
                     ))}
                   </div>
 
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
-                    {/* Synthesis Column */}
                     <div className="space-y-5">
                       <div className="flex items-center justify-between px-2">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
                             <MessagesSquare size={20} />
                           </div>
-                          <h4 className="font-bold text-slate-800 text-sm uppercase tracking-widest">Research Update</h4>
+                          <h4 className="font-bold text-slate-800 text-sm uppercase tracking-widest">Synthesis Report</h4>
                         </div>
-                        <button onClick={() => handleSpeak(round.synthesis, `syn-${idx}`)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
+                        <button 
+                          onClick={() => handleSpeak(round.synthesis, `syn-${idx}`)} 
+                          className={`p-2 transition-all rounded-xl ${isPlaying === `syn-${idx}` ? 'text-indigo-600 bg-indigo-50 animate-pulse' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                        >
                           <Volume2 size={16} />
                         </button>
                       </div>
-                      <div className="bg-slate-50 rounded-[2.5rem] p-10 border border-slate-100 text-slate-700 text-sm shadow-inner min-h-[180px] leading-relaxed relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12 group-hover:rotate-0 transition-transform"><Trophy size={64} className="text-indigo-900" /></div>
-                        <ReactMarkdown className="prose prose-slate prose-sm max-w-none relative z-10">{round.synthesis}</ReactMarkdown>
+                      <div className="bg-slate-50 rounded-[2.5rem] p-8 border border-slate-100 text-slate-700 text-sm shadow-inner min-h-[180px] leading-relaxed relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-4 opacity-5 rotate-12 group-hover:rotate-0 transition-transform"><Activity size={64} className="text-indigo-900" /></div>
+                        <ReactMarkdown className="prose prose-slate prose-sm max-w-none relative z-10 prose-headings:text-indigo-900 prose-strong:text-indigo-700">{round.synthesis}</ReactMarkdown>
                       </div>
                     </div>
 
-                    {/* Evolved Contract Column */}
                     <div className="space-y-5">
                       <div className="flex items-center justify-between px-2">
                         <div className="flex items-center gap-3">
@@ -376,18 +420,18 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
                         {round.evolvedContract && (
                           <button 
                             onClick={() => pullToLab(round.evolvedContract || '')}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-all active:scale-95"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-all active:scale-95 shadow-sm"
                           >
-                            <Microscope size={12} /> Refine in Lab
+                            <Edit3 size={12} /> Pull to Lab
                           </button>
                         )}
                       </div>
-                      <div className="bg-emerald-50/30 rounded-[2.5rem] p-10 border border-emerald-100 text-emerald-900 text-sm shadow-inner min-h-[180px] leading-relaxed font-mono relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-4 opacity-10 -rotate-12 group-hover:rotate-0 transition-transform"><Wand2 size={64} className="text-emerald-900" /></div>
+                      <div className="bg-emerald-50/30 rounded-[2.5rem] p-8 border border-emerald-100 text-emerald-900 text-sm shadow-inner min-h-[180px] leading-relaxed font-mono relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-4 opacity-5 -rotate-12 group-hover:rotate-0 transition-transform"><Wand2 size={64} className="text-emerald-900" /></div>
                         <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-4 flex items-center gap-2">
-                           <Zap size={10} fill="currentColor" /> Target for next peer review generation
+                           <Zap size={10} fill="currentColor" /> Targeted Evolution
                         </div>
-                        <ReactMarkdown className="prose prose-emerald prose-sm max-w-none opacity-90 relative z-10">{round.evolvedContract || "Thesis remains static."}</ReactMarkdown>
+                        <ReactMarkdown className="prose prose-emerald prose-sm max-w-none opacity-90 relative z-10">{round.evolvedContract || "Thesis stable."}</ReactMarkdown>
                       </div>
                     </div>
                   </div>
@@ -399,16 +443,16 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
           {isProcessing && (
             <div className="bg-white rounded-[2.5rem] border-2 border-dashed border-indigo-200 p-16 flex flex-col items-center gap-8 animate-pulse shadow-sm">
               <div className="relative">
-                <Microscope size={64} className="text-indigo-600 animate-bounce" />
-                <div className="absolute inset-0 bg-indigo-500 rounded-full blur-3xl opacity-20 animate-ping" />
+                <Atom size={64} className="text-indigo-600 animate-spin-slow" />
+                <div className="absolute inset-0 bg-indigo-500 rounded-full blur-3xl opacity-20 animate-pulse" />
               </div>
               <div className="text-center space-y-3">
                 <div className="font-bold text-indigo-600 text-xl uppercase tracking-[0.3em]">
-                  {currentStep === 'parallel' ? 'Trial Simulations' : 
-                   currentStep === 'synthesis' ? 'Thesis Mutation' : 
-                   'Recording Genetic Map'}
+                  {currentStep === 'parallel' ? 'Peer Analysis' : 
+                   currentStep === 'synthesis' ? 'Synthesizing Mutation' : 
+                   'Archiving Genome'}
                 </div>
-                <p className="text-slate-400 text-sm italic max-w-xs mx-auto">"Synthesizing logical mutations for the next R&D iteration..."</p>
+                <p className="text-slate-400 text-sm italic max-w-xs mx-auto">"Evaluating feasibility and deconstructing logic..."</p>
               </div>
             </div>
           )}
@@ -416,54 +460,171 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
       </div>
 
       {showInsights && (
-        <div className="lg:w-80 space-y-6 flex-shrink-0 animate-in slide-in-from-right duration-300 pb-12">
+        <div className="lg:w-80 space-y-6 flex-shrink-0 animate-in slide-in-from-right duration-300 pb-12 flex flex-col">
           <div className="flex items-center justify-between px-2">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Lab Diagnostics</h3>
             <button onClick={() => setShowInsights(false)} className="text-slate-400 hover:text-slate-600 transition-colors active:scale-95"><Minimize2 size={16} /></button>
           </div>
-          <div className="max-h-[calc(100vh-180px)] overflow-y-auto space-y-6 pr-1 custom-scrollbar">
-            <ConvergenceChart rounds={session.rounds} />
-            
-            <div className="bg-slate-900 text-white rounded-[2rem] p-8 shadow-2xl space-y-6 border border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-amber-500 rounded-2xl flex items-center justify-center text-slate-900 shadow-xl shadow-amber-500/20">
-                  <Edit3 size={20} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-xs uppercase tracking-widest text-amber-500">Director Override</h3>
-                  <span className="text-[10px] text-slate-500">Manual Pressure Control</span>
-                </div>
-              </div>
-              <p className="text-[10px] text-slate-400 leading-relaxed italic">Directly steer the next generation's thesis if the machine drift stalls.</p>
-              <textarea 
-                value={manualContract}
-                onChange={(e) => setManualContract(e.target.value)}
-                placeholder="Inject manual constraints or steer the thesis..."
-                className="w-full p-5 bg-slate-800/50 border border-slate-700 rounded-2xl text-xs outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all placeholder:text-slate-600 leading-relaxed text-slate-300 shadow-inner font-mono"
-                rows={6}
-              />
+
+          <div className="bg-white border border-slate-200 rounded-[2rem] flex flex-col min-h-0 flex-1 shadow-sm overflow-hidden">
+            {/* Lab Tabs */}
+            <div className="flex border-b border-slate-100">
               <button 
-                onClick={applyIntervention}
-                className="w-full bg-amber-500 text-slate-900 font-bold py-4 rounded-2xl text-xs hover:bg-amber-400 transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10"
+                onClick={() => setDiagTab('analytics')}
+                className={`flex-1 flex flex-col items-center py-4 gap-1 transition-all ${diagTab === 'analytics' ? 'bg-indigo-50 text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400 hover:bg-slate-50'}`}
               >
-                <ShieldCheck size={16} /> Update Next Gen Thesis
+                <BarChart3 size={18} />
+                <span className="text-[9px] font-bold uppercase tracking-wider">Analysis</span>
+              </button>
+              <button 
+                onClick={() => setDiagTab('intelligence')}
+                className={`flex-1 flex flex-col items-center py-4 gap-1 transition-all ${diagTab === 'intelligence' ? 'bg-indigo-50 text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400 hover:bg-slate-50'}`}
+              >
+                <Brain size={18} />
+                <span className="text-[9px] font-bold uppercase tracking-wider">Intelligence</span>
+              </button>
+              <button 
+                onClick={() => setDiagTab('control')}
+                className={`flex-1 flex flex-col items-center py-4 gap-1 transition-all ${diagTab === 'control' ? 'bg-indigo-50 text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400 hover:bg-slate-50'}`}
+              >
+                <Terminal size={18} />
+                <span className="text-[9px] font-bold uppercase tracking-wider">Control</span>
               </button>
             </div>
 
-            <div className="bg-white rounded-[2rem] border border-slate-200 p-8 shadow-sm space-y-6">
-              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2 uppercase tracking-widest"><Trophy size={16} className="text-amber-500" />Fitness Rank</h3>
-              <div className="space-y-3">
-                {leaderboard.map((m, i) => (
-                  <div key={m.name} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 group transition-all hover:bg-white hover:shadow-md hover:border-indigo-100">
-                    <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-sm">{i + 1}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[11px] font-bold text-slate-700 truncate">{m.name}</div>
-                      <div className="text-[9px] text-slate-400 mt-1 uppercase tracking-tighter">{m.totalChars.toLocaleString()} chars Preserved</div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+              {diagTab === 'analytics' && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  <ConvergenceChart rounds={session.rounds} />
+                  
+                  <div className="space-y-4">
+                    <h4 className="font-bold text-slate-800 text-xs uppercase tracking-widest flex items-center gap-2">
+                      <Trophy size={14} className="text-amber-500" /> Model Fitness
+                    </h4>
+                    <div className="space-y-3">
+                      {leaderboard.length > 0 ? (
+                        leaderboard.map((m, i) => (
+                          <div key={m.name} className="flex items-center gap-4 p-3 bg-slate-50 rounded-2xl border border-slate-100 group transition-all hover:bg-white hover:shadow-md hover:border-indigo-100">
+                            <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-sm">{i + 1}</div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[10px] font-bold text-slate-700 truncate">{m.name}</div>
+                              <div className="text-[8px] text-slate-400 mt-0.5 uppercase tracking-tighter">{m.totalChars.toLocaleString()} chars preserved</div>
+                            </div>
+                            <div className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-100">{m.avgRating ? m.avgRating.toFixed(1) : '—'} ★</div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[10px] text-slate-400 italic text-center py-4">Awaiting lab results...</p>
+                      )}
                     </div>
-                    <div className="text-[11px] font-bold text-amber-600 flex items-center gap-1 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100"><Star size={10} fill="currentColor" />{m.avgRating ? m.avgRating.toFixed(1) : '—'}</div>
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
+
+              {diagTab === 'intelligence' && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  {latestRound ? (
+                    <div className="space-y-6">
+                      <div className="bg-indigo-50 p-5 rounded-3xl border border-indigo-100 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Activity size={14} className="text-indigo-600" />
+                          <h4 className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest">Latest Briefing</h4>
+                        </div>
+                        <p className="text-[11px] text-indigo-900 leading-relaxed italic">
+                          {latestRound.synthesis.substring(0, 200)}...
+                        </p>
+                        <button 
+                          onClick={() => handleSpeak(latestRound.synthesis, 'brief-tab')}
+                          className="w-full bg-white text-indigo-600 font-bold py-2 rounded-xl text-[10px] uppercase border border-indigo-100 hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
+                        >
+                          <Volume2 size={12} /> Speak Full Report
+                        </button>
+                      </div>
+
+                      <div className="space-y-4">
+                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Specialist Snapshots</h4>
+                        {latestRound.runs.map((run, i) => (
+                          <div key={i} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[9px] font-bold text-slate-700 uppercase">{run.aiName.split('(')[1]?.replace(')', '') || 'Specialist'}</span>
+                              <span className="text-[8px] font-mono text-slate-400">{run.charCount}ch</span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 line-clamp-2 italic leading-relaxed">"{run.response}"</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-20 space-y-4">
+                      <Brain size={48} className="mx-auto text-slate-100" />
+                      <p className="text-[10px] text-slate-400 uppercase font-bold tracking-[0.2em]">Awaiting Intelligence</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {diagTab === 'control' && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  {/* Meta-Optimization Action */}
+                  <div className="bg-indigo-600 text-white rounded-[2rem] p-6 space-y-4 shadow-xl shadow-indigo-500/20 relative overflow-hidden group">
+                     <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12 group-hover:rotate-0 transition-transform"><Dna size={48} /></div>
+                     <div className="flex items-center gap-2">
+                       <Sparkles size={16} className="text-amber-400" />
+                       <h4 className="font-bold text-[10px] uppercase tracking-widest">Self-Optimization</h4>
+                     </div>
+                     <p className="text-[10px] text-indigo-100 leading-relaxed italic">Use the Lab results to 'fix' the app's own orchestration logic.</p>
+                     <button 
+                       onClick={handleSelfOptimize}
+                       disabled={!latestRound}
+                       className="w-full bg-white text-indigo-600 font-bold py-3 rounded-xl text-[10px] uppercase hover:bg-indigo-50 transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/10 disabled:opacity-50"
+                     >
+                       <RefreshCcw size={14} /> Meta-Optimize Logic
+                     </button>
+                  </div>
+
+                  <div className="bg-slate-900 text-white rounded-[2rem] p-6 space-y-4 shadow-xl border border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-amber-500 rounded-xl flex items-center justify-center text-slate-900 shadow-lg shadow-amber-500/20">
+                        <Edit3 size={16} />
+                      </div>
+                      <h4 className="font-bold text-[10px] uppercase tracking-widest text-amber-500">Director Override</h4>
+                    </div>
+                    <textarea 
+                      value={manualContract}
+                      onChange={(e) => setManualContract(e.target.value)}
+                      placeholder="Inject manual constraints or steer the thesis..."
+                      className="w-full p-4 bg-slate-800/50 border border-slate-700 rounded-2xl text-[11px] outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all placeholder:text-slate-600 leading-relaxed text-slate-300 shadow-inner font-mono"
+                      rows={6}
+                    />
+                    <button 
+                      onClick={applyIntervention}
+                      className="w-full bg-amber-500 text-slate-900 font-bold py-3 rounded-xl text-[10px] uppercase hover:bg-amber-400 transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10"
+                    >
+                      <ShieldCheck size={14} /> Update Lab Genome
+                    </button>
+                  </div>
+
+                  <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4 shadow-inner">
+                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Experiment Variables</h4>
+                    <div className="space-y-4">
+                       <div className="space-y-2">
+                         <div className="flex justify-between text-[10px] font-bold text-slate-600 uppercase">
+                           <span>Convergence Threshold</span>
+                           <span>{threshold}%</span>
+                         </div>
+                         <input 
+                           type="range" 
+                           min="50" 
+                           max="95" 
+                           value={threshold} 
+                           onChange={(e) => setThreshold(parseInt(e.target.value))}
+                           className="w-full accent-indigo-600"
+                         />
+                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
