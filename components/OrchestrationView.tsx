@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-  Play, 
   RotateCw, 
   ShieldCheck, 
   MessagesSquare, 
@@ -9,18 +8,12 @@ import {
   Zap, 
   Lock, 
   Globe, 
-  FileText, 
   HardDriveDownload, 
   ClipboardCheck, 
-  Fingerprint, 
   PanelRight, 
-  Minimize2, 
   BarChart3, 
   Terminal, 
-  Microscope,
   TestTube2,
-  History,
-  Activity,
   ShieldAlert,
   Dna,
   Workflow,
@@ -28,11 +21,10 @@ import {
   Cpu,
   ListChecks,
   Swords,
-  Timer,
-  ZapOff
+  Timer
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { Session, Round, ModelMetric, OrchestrationPhase } from '../types';
+import { Session, Round, ModelMetric } from '../types';
 import { simulateParallelAIs, simulateSequentialAIs, synthesizeDebrief, synthesizeCompetitiveDebrief } from '../services/gemini';
 import { piecesService } from '../services/pieces';
 import { generateMasterAuditReport } from '../services/audit';
@@ -92,27 +84,13 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
     if (isProcessing || session.status === 'converged') return;
     setIsProcessing(true);
     
-    const lastRound = session.rounds[session.rounds.length - 1];
     const currentRoundNum = session.rounds.length + 1;
+    const schemaName = session.contract.schema.toUpperCase();
     
-    // Determine Phase & Budget
-    let currentPhase: OrchestrationPhase = session.phase;
-    let budget = 1000;
+    addIatLog(`INITIATING ${schemaName} ORCHESTRATION CYCLE...`);
+    addIatLog("COHERENCE GATE: SYNERGIZING COLLECTIVE LOGIC...");
 
-    if (currentRoundNum === 1) {
-      currentPhase = 'initial';
-      budget = 10000;
-      addIatLog("PROTOCOL 01-DELTA: INITIATING INITIAL PASS [BUDGET: 10,000]");
-    } else if (lastRound && lastRound.synthesisCharCount < 950) {
-      currentPhase = 'parallel_convergence';
-      budget = 1000;
-      addIatLog("PROTOCOL 01-DELTA: TRIGGERING PARALLEL CONVERGENCE [BUDGET EXHAUSTED]");
-    } else {
-      currentPhase = 'series';
-      budget = 1000;
-      addIatLog(`PROTOCOL 01-DELTA: SERIES PASS ${currentRoundNum} [BUDGET: 1,000]`);
-    }
-
+    const lastRound = session.rounds[session.rounds.length - 1];
     const activeContract = lastRound?.evolvedContract || session.contract.context;
     const baseTopic = lastRound ? lastRound.synthesis : session.contract.topic;
 
@@ -123,19 +101,17 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
       });
 
       let runs;
-      // Execute based on phase logic
-      if (currentPhase === 'initial' || currentPhase === 'parallel_convergence') {
-        runs = await simulateParallelAIs(activeContract, baseTopic, activePartnerObjects, session.activeTools, budget);
+      if (session.contract.schema === 'sequential') {
+        runs = await simulateSequentialAIs(activeContract, baseTopic, activePartnerObjects, session.activeTools);
       } else {
-        // Series Phase: Run sequential passes building on previous
-        runs = await simulateSequentialAIs(activeContract, baseTopic, activePartnerObjects, session.activeTools, budget);
+        runs = await simulateParallelAIs(activeContract, baseTopic, activePartnerObjects, session.activeTools);
       }
       
       let synthesisRes: { synthesis: string, evolvedContract: string };
-      if (session.contract.schema === 'competitive' && currentPhase !== 'initial') {
-        synthesisRes = await synthesizeCompetitiveDebrief(runs, activeContract, baseTopic, budget);
+      if (session.contract.schema === 'competitive') {
+        synthesisRes = await synthesizeCompetitiveDebrief(runs, activeContract, baseTopic);
       } else {
-        synthesisRes = await synthesizeDebrief(runs, activeContract, budget);
+        synthesisRes = await synthesizeDebrief(runs, activeContract);
       }
       
       const iatSig = piecesService.generateIATSignature(currentRoundNum, session.contract.topic);
@@ -145,10 +121,9 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
         runs,
         synthesis: synthesisRes.synthesis,
         evolvedContract: synthesisRes.evolvedContract,
-        synthesisCharCount: synthesisRes.synthesis.length + synthesisRes.evolvedContract.length,
+        synthesisCharCount: synthesisRes.synthesis.length + (synthesisRes.evolvedContract?.length || 0),
         timestamp: new Date().toISOString(),
-        iatSignature: iatSig,
-        phase: currentPhase
+        iatSignature: iatSig
       };
 
       if (session.isPiecesConnected) {
@@ -158,8 +133,7 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
       onUpdate({ 
         ...session, 
         rounds: [...session.rounds, newRound],
-        phase: currentPhase === 'parallel_convergence' ? 'completed' : currentPhase,
-        status: currentPhase === 'parallel_convergence' ? 'converged' : 'orchestrating'
+        status: 'orchestrating'
       });
       
       addIatLog(`NIHILO SEALED: GEN ${currentRoundNum} [${newRound.synthesisCharCount} chars]`);
@@ -174,41 +148,18 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
   const latestRound = session.rounds[session.rounds.length - 1];
   const leaderboard = (Object.values(session.modelMetrics) as ModelMetric[]).sort((a, b) => b.totalChars - a.totalChars);
 
-  const getPhaseIcon = (phase: OrchestrationPhase) => {
-    switch (phase) {
-      case 'initial': return <Zap size={14} className="text-amber-400" />;
-      case 'series': return <ListChecks size={14} className="text-indigo-400" />;
-      case 'parallel_convergence': return <Swords size={14} className="text-red-400" />;
-      case 'completed': return <ShieldCheck size={14} className="text-emerald-400" />;
+  const getSchemaIcon = (id: string) => {
+    switch (id) {
+      case 'parallel': return <Cpu size={14} className="text-indigo-400" />;
+      case 'sequential': return <ListChecks size={14} className="text-indigo-400" />;
+      case 'competitive': return <Swords size={14} className="text-indigo-400" />;
       default: return null;
     }
   };
 
-  const budgetProgress = useMemo(() => {
-    if (!latestRound) return 0;
-    const limit = latestRound.roundNumber === 1 ? 10000 : 1000;
-    return Math.min((latestRound.synthesisCharCount / limit) * 100, 100);
-  }, [latestRound]);
-
   return (
     <div className={`flex flex-col lg:flex-row gap-6 h-full min-h-0 transition-colors duration-1000 ${themeStyles.bg === 'slate-950' ? 'text-slate-100 bg-slate-950' : 'text-slate-900'}`}>
       
-      {/* HARDENED SNAPSHOT TRIGGER */}
-      <div className="fixed bottom-10 left-10 z-[100] group">
-        <button 
-          onClick={downloadForensicLedger}
-          className={`flex items-center gap-4 px-10 py-6 rounded-[2.5rem] font-black shadow-2xl transition-all active:scale-95 border-4 ${isAuditCopied ? 'bg-emerald-600 border-emerald-400 text-white' : 'bg-slate-900 border-slate-700 text-white hover:border-indigo-500 hover:bg-slate-800'}`}
-        >
-          <div className="p-3 rounded-2xl bg-slate-800 border border-slate-700">
-            {isAuditCopied ? <ClipboardCheck size={28} /> : <HardDriveDownload size={28} />}
-          </div>
-          <div className="flex flex-col items-start text-left">
-            <span className="text-[10px] tracking-[0.4em] uppercase font-bold text-slate-500">Forensic Handover</span>
-            <span className="text-lg uppercase tracking-tight">{isAuditCopied ? 'Ledger Ready' : 'Download Snapshot'}</span>
-          </div>
-        </button>
-      </div>
-
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${showInsights ? 'lg:w-2/3' : 'w-full'}`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 sticky top-0 z-20 py-4 px-2 bg-inherit backdrop-blur-md border-b border-slate-200/10">
           <div className="flex items-center gap-4">
@@ -220,36 +171,22 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
               <div className="flex items-center gap-3 mt-0.5 opacity-60">
                 <Dna size={12} />
                 <span className="text-[10px] font-bold uppercase tracking-[0.2em] flex items-center gap-2">
-                  Protocol {session.phase.toUpperCase()} Active {getPhaseIcon(session.phase)}
+                  Protocol {session.contract.schema.toUpperCase()} Active {getSchemaIcon(session.contract.schema)}
                 </span>
               </div>
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
-            {latestRound && (
-              <div className="hidden md:flex flex-col items-end gap-1">
-                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                  <Timer size={12} /> Budget Efficiency
-                </div>
-                <div className="w-32 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full transition-all duration-1000 ${budgetProgress > 90 ? 'bg-indigo-500' : 'bg-amber-500'}`} 
-                    style={{ width: `${budgetProgress}%` }} 
-                  />
-                </div>
-              </div>
-            )}
-
+          <div className="flex items-center gap-2">
             {!showInsights && (
               <button onClick={() => setShowInsights(true)} className="p-3 rounded-2xl bg-white/10 border border-slate-200/20 text-inherit hover:bg-white/20 transition-all active:scale-95 shadow-sm"><PanelRight size={20} /></button>
             )}
             <button
               onClick={runNextRound}
-              disabled={isProcessing || session.status === 'converged'}
-              className={`flex items-center gap-2 px-8 py-3 rounded-2xl font-bold transition-all ${session.status === 'converged' ? 'bg-emerald-600' : 'bg-indigo-600'} text-white shadow-2xl hover:scale-105 active:scale-95 disabled:opacity-50`}
+              disabled={isProcessing}
+              className={`flex items-center gap-2 px-8 py-3 rounded-2xl font-bold transition-all bg-indigo-600 text-white shadow-2xl hover:scale-105 active:scale-95 disabled:opacity-50`}
             >
-              {isProcessing ? <><RotateCw size={18} className="animate-spin" />Syncing Gate...</> : session.status === 'converged' ? <><ShieldCheck size={18} />Gauntlet Complete</> : <><Zap size={18} fill="currentColor" />{session.rounds.length === 0 ? 'Ignite Lab' : 'Execute Pass'}</>}
+              {isProcessing ? <><RotateCw size={18} className="animate-spin" />Syncing Gate...</> : <><Zap size={18} fill="currentColor" />{session.rounds.length === 0 ? 'Ignite Lab' : 'Distribute & Optimize'}</>}
             </button>
           </div>
         </div>
@@ -274,7 +211,7 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
                         </div>
                         <div>
                            <span className="text-[10px] font-bold opacity-70 uppercase tracking-[0.3em] block mb-2">Gen {latestRound.roundNumber} Optimized Intelligence</span>
-                           <span className="text-xl font-bold">Structural Evolution State [PHASE: {latestRound.phase}]</span>
+                           <span className="text-xl font-bold">Structural Evolution State</span>
                         </div>
                      </div>
                      <div className="text-right">
@@ -286,7 +223,7 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
                   <div className="p-12 space-y-16">
                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                         {latestRound.runs.map((run, i) => (
-                           <div key={i} className={`p-6 rounded-[2rem] bg-slate-500/5 border border-white/10 space-y-4 hover:border-indigo-500/50 transition-all shadow-sm ${latestRound.phase === 'series' ? 'relative after:content-["→"] after:absolute after:-right-4 after:top-1/2 after:-translate-y-1/2 after:text-indigo-400/30 after:font-bold last:after:hidden' : ''}`}>
+                           <div key={i} className={`p-6 rounded-[2rem] bg-slate-500/5 border border-white/10 space-y-4 hover:border-indigo-500/50 transition-all shadow-sm ${session.contract.schema === 'sequential' ? 'relative after:content-["→"] after:absolute after:-right-4 after:top-1/2 after:-translate-y-1/2 after:text-indigo-400/30 after:font-bold last:after:hidden' : ''}`}>
                               <span className="text-[10px] font-bold uppercase text-indigo-400">{run.aiName.split('(')[1]?.replace(')', '') || 'Specialist'}</span>
                               <p className="text-[11px] opacity-70 line-clamp-6 italic leading-relaxed">{run.response}</p>
                               <div className="text-[9px] font-bold text-slate-500 mt-2">{run.charCount.toLocaleString()} chars</div>
@@ -301,9 +238,6 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
                               <h4 className="font-bold text-lg uppercase tracking-widest opacity-80">Strategic Debrief</h4>
                            </div>
                            <div className="bg-slate-900/40 rounded-[3rem] p-10 border border-white/10 text-sm shadow-inner min-h-[350px] leading-relaxed relative">
-                              <div className="absolute top-6 right-8 text-[10px] font-mono text-slate-600 bg-black/20 px-3 py-1 rounded-full">
-                                {latestRound.synthesis.length.toLocaleString()} bytes
-                              </div>
                               <ReactMarkdown className="prose prose-invert prose-sm max-w-none">{latestRound.synthesis}</ReactMarkdown>
                            </div>
                         </div>
@@ -313,9 +247,6 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
                               <h4 className="font-bold text-lg uppercase tracking-widest opacity-80">Hardened Thesis (Evolved)</h4>
                            </div>
                            <div className="bg-emerald-500/5 rounded-[3rem] p-10 border border-emerald-500/20 text-sm shadow-inner min-h-[350px] leading-relaxed font-mono relative">
-                              <div className="absolute top-6 right-8 text-[10px] font-mono text-emerald-600/60 bg-white/5 px-3 py-1 rounded-full">
-                                {latestRound.evolvedContract?.length.toLocaleString() || 0} bytes
-                              </div>
                               <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-[0.4em] mb-6 flex items-center gap-2">
                                  <Zap size={12} fill="currentColor" /> Mutation Logic
                               </div>
@@ -354,18 +285,16 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
                 <div className="space-y-8 animate-in fade-in duration-500">
                   <ConvergenceChart rounds={session.rounds} />
                   <div className="space-y-4">
-                    <h4 className="font-bold text-[10px] uppercase tracking-[0.3em] opacity-40">Gauntlet Efficiency</h4>
+                    <h4 className="font-bold text-[10px] uppercase tracking-[0.3em] opacity-40">Intelligence State</h4>
                     {latestRound ? (
                        <div className="p-6 bg-slate-900/40 rounded-3xl border border-white/5 space-y-4">
                           <div className="flex justify-between items-center text-[10px] font-bold uppercase text-slate-500 tracking-widest">
-                            <span>Current Phase</span>
-                            <span className="text-indigo-400">{latestRound.phase}</span>
+                            <span>Active Units</span>
+                            <span className="text-indigo-400">{session.activePartners.length}</span>
                           </div>
                           <div className="flex justify-between items-center text-[10px] font-bold uppercase text-slate-500 tracking-widest">
-                            <span>Utilized Budget</span>
-                            <span className={budgetProgress > 90 ? 'text-indigo-400' : 'text-amber-400'}>
-                              {latestRound.synthesisCharCount.toLocaleString()} / {latestRound.roundNumber === 1 ? '10k' : '1k'}
-                            </span>
+                            <span>Output Volume</span>
+                            <span className="text-indigo-400">{latestRound.synthesisCharCount.toLocaleString()} bytes</span>
                           </div>
                        </div>
                     ) : (
@@ -390,6 +319,22 @@ const OrchestrationView: React.FC<OrchestrationViewProps> = ({ session, onUpdate
           </div>
         </div>
       )}
+      
+      {/* HARDENED SNAPSHOT TRIGGER */}
+      <div className="fixed bottom-10 left-10 z-[100] group">
+        <button 
+          onClick={downloadForensicLedger}
+          className={`flex items-center gap-4 px-10 py-6 rounded-[2.5rem] font-black shadow-2xl transition-all active:scale-95 border-4 ${isAuditCopied ? 'bg-emerald-600 border-emerald-400 text-white' : 'bg-slate-900 border-slate-700 text-white hover:border-indigo-500 hover:bg-slate-800'}`}
+        >
+          <div className="p-3 rounded-2xl bg-slate-800 border border-slate-700">
+            {isAuditCopied ? <ClipboardCheck size={28} /> : <HardDriveDownload size={28} />}
+          </div>
+          <div className="flex flex-col items-start text-left">
+            <span className="text-[10px] tracking-[0.4em] uppercase font-bold text-slate-500">Forensic Handover</span>
+            <span className="text-lg uppercase tracking-tight">{isAuditCopied ? 'Ledger Ready' : 'Download Snapshot'}</span>
+          </div>
+        </button>
+      </div>
     </div>
   );
 };

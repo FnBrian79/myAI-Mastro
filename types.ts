@@ -1,6 +1,5 @@
 
 export type SchemaType = 'parallel' | 'sequential' | 'competitive';
-export type OrchestrationPhase = 'initial' | 'series' | 'parallel_convergence' | 'completed';
 
 export interface Schema {
   id: SchemaType;
@@ -61,7 +60,6 @@ export interface Round {
   timestamp: string;
   piecesId?: string;
   iatSignature?: string; 
-  phase: OrchestrationPhase;
 }
 
 export interface Session {
@@ -69,7 +67,6 @@ export interface Session {
   contract: Contract;
   rounds: Round[];
   status: 'idle' | 'co-creating' | 'orchestrating' | 'completed' | 'converged';
-  phase: OrchestrationPhase;
   convergencePeak?: number;
   convergenceThreshold?: number;
   activePartners: string[];

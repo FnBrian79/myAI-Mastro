@@ -5,6 +5,7 @@ import { ollamaService } from "./ollama";
 // Initialize the Google GenAI client with the API key from environment variables.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+// Basic content generation helper with fixed system instructions for the R&D persona.
 export const conductSession = async (prompt: string, role: string = "Chief Research Director") => {
   const model = 'gemini-3-flash-preview';
   const result = await ai.models.generateContent({
@@ -20,6 +21,34 @@ export const conductSession = async (prompt: string, role: string = "Chief Resea
   return result.text;
 };
 
+// Implemented conductSearchSession to handle web search grounding requests.
+export const conductSearchSession = async (prompt: string) => {
+  const model = 'gemini-3-flash-preview';
+  const result = await ai.models.generateContent({
+    model,
+    contents: prompt,
+    config: {
+      tools: [{ googleSearch: {} }],
+    },
+  });
+  return {
+    text: result.text || "",
+    grounding: result.candidates?.[0]?.groundingMetadata?.groundingChunks
+  };
+};
+
+// Implemented refineContract to allow hardening and optimizing the research hypothesis.
+export const refineContract = async (topic: string, context: string) => {
+  const prompt = `REFINEMENT TASK:
+  Topic: ${topic}
+  Current Context: ${context}
+  
+  Please refine and harden this hypothesis for a high-stakes R&D experiment. Focus on structural feasibility, technical precision, and internal coherence. Destroy vague generalizations.`;
+  
+  return conductSession(prompt, "Hypothesis Architect");
+};
+
+// Complex reasoning unit using Gemini 3 Pro with thinking budget enabled.
 export const askGeminiComplex = async (prompt: string, history: any[] = []) => {
   const contents = history.length > 0 ? history : [{ role: 'user', parts: [{ text: prompt }] }];
   
@@ -40,7 +69,8 @@ export const askGeminiComplex = async (prompt: string, history: any[] = []) => {
   return response.text;
 };
 
-export const synthesizeDebrief = async (responses: any[], currentContract: string, budget: number = 1000) => {
+// Synthesizes logs from multiple units into an evolved thesis.
+export const synthesizeDebrief = async (responses: any[], currentContract: string) => {
   const responsesText = responses.map(r => `## REVIEWER: ${r.aiName.toUpperCase()}\n${r.response}`).join('\n\n');
   const prompt = `You are the Chief Research Director implementing DISTRIBUTED INTELLIGENCE OPTIMIZATION.
   
@@ -50,13 +80,11 @@ export const synthesizeDebrief = async (responses: any[], currentContract: strin
   DISTRIBUTED INTELLIGENCE LOGS:
   ${responsesText}
   
-  ### MISSION: PROTOCOL 01-DELTA OPTIMIZATION [STRICT BUDGET: ${budget} CHARACTERS]
+  ### MISSION: PROTOCOL 01-DELTA OPTIMIZATION
   1. NIHILO DECONSTRUCTION: Identify and remove components that are logically weak.
   2. COHERENCE VALIDATION: Find "Speculative Bridges" that use intelligence to make the thesis structurally better.
   3. DISTRIBUTED SYNERGY: How do these disparate views combine into a superior state?
   4. EVOLUTION: Produce the "Hardened Thesis" (Contract) for the next generation.
-  
-  STRICT CONSTRAINT: Your total output for Synthesis + Evolved Contract MUST BE LESS THAN ${budget} characters.
   
   OUTPUT FORMAT:
   ### Synthesis
@@ -85,7 +113,8 @@ const getRoleConfig = (index: number) => {
   return roles[index % roles.length];
 };
 
-export const simulateParallelAIs = async (contract: string, topic: string, partners: {name: string, type: 'SLM' | 'LLM', isLocal?: boolean}[], enabledTools: string[], budget: number = 1000) => {
+// Executes evaluation tasks in parallel across the selected model pool.
+export const simulateParallelAIs = async (contract: string, topic: string, partners: {name: string, type: 'SLM' | 'LLM', isLocal?: boolean}[], enabledTools: string[]) => {
   const tasks = partners.map(async (partner, index) => {
     const roleConfig = getRoleConfig(index);
     const prompt = `### LABORATORY EXPERIMENT: ${topic}
@@ -98,8 +127,8 @@ export const simulateParallelAIs = async (contract: string, topic: string, partn
     Specialization: ${roleConfig.role}
     Mission: ${roleConfig.focus}
     
-    ### TASK [STRICT BUDGET: ${budget} CHARACTERS]
-    Perform a rigorous evaluation. Contribute your specialized intelligence to make the whole thesis better. Keep your response brief and optimized under ${budget} chars.`;
+    ### TASK
+    Perform a rigorous evaluation. Contribute your specialized intelligence to make the whole thesis better.`;
 
     let responseText = "";
     let searchGrounding = undefined;
@@ -129,7 +158,8 @@ export const simulateParallelAIs = async (contract: string, topic: string, partn
   return Promise.all(tasks);
 };
 
-export const simulateSequentialAIs = async (contract: string, topic: string, partners: {name: string, type: 'SLM' | 'LLM', isLocal?: boolean}[], enabledTools: string[], budget: number = 1000) => {
+// Executes evaluation tasks sequentially, enabling iterative building of context.
+export const simulateSequentialAIs = async (contract: string, topic: string, partners: {name: string, type: 'SLM' | 'LLM', isLocal?: boolean}[], enabledTools: string[]) => {
   const runs: any[] = [];
   let chainContext = "";
 
@@ -149,8 +179,8 @@ export const simulateSequentialAIs = async (contract: string, topic: string, par
     Specialization: ${roleConfig.role}
     Mission: ${roleConfig.focus}
     
-    ### TASK [STRICT BUDGET: ${budget} CHARACTERS]
-    Build upon the previous units' work. Focus on evolving the thesis through your specialized lens. Keep your response optimized under ${budget} chars.`;
+    ### TASK
+    Build upon the previous units' work. Focus on evolving the thesis through your specialized lens.`;
 
     let responseText = "";
     let searchGrounding = undefined;
@@ -183,14 +213,15 @@ export const simulateSequentialAIs = async (contract: string, topic: string, par
   return runs;
 };
 
-export const synthesizeCompetitiveDebrief = async (responses: any[], currentContract: string, topic: string, budget: number = 1000) => {
+// Arbiter synthesis for competitive mode.
+export const synthesizeCompetitiveDebrief = async (responses: any[], currentContract: string, topic: string) => {
   const responsesText = responses.map(r => `## CANDIDATE: ${r.aiName.toUpperCase()}\n${r.response}`).join('\n\n');
   const prompt = `You are the Lab Arbiter judging a competitive debate on: ${topic}
   
   DEBATE LOG:
   ${responsesText}
   
-  ### TASK [STRICT BUDGET: ${budget} CHARACTERS]
+  ### TASK
   Determine the superior logic by using distributed intelligence to bridge opposing views into a better version.
   
   OUTPUT FORMAT:
@@ -208,6 +239,7 @@ export const synthesizeCompetitiveDebrief = async (responses: any[], currentCont
   };
 };
 
+// Transforms text to audio using the Gemini TTS model.
 export const generateSpeech = async (text: string) => {
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
