@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   Cpu, 
@@ -77,6 +76,7 @@ export const SCENARIOS: Scenario[] = [
 ];
 
 export const INITIAL_PARTNERS = [
+  "GPT-5.1-Codex-Max",
   "Gemini 3 Pro",
   "Claude 3.5 Sonnet",
   "GPT-4o",
@@ -91,6 +91,7 @@ export interface ModelEntry {
 }
 
 export const MODEL_POOL: ModelEntry[] = [
+  { name: "GPT-5.1-Codex-Max", type: 'LLM' },
   { name: "Gemini 3 Pro", type: 'LLM' },
   { name: "Gemini 3 Flash", type: 'LLM' },
   { name: "Claude 3.5 Sonnet", type: 'LLM' },
